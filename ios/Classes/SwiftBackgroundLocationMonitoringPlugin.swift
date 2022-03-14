@@ -14,6 +14,21 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin {
     // SwiftBackgroundLocationMonitoringPlugin.channel?.setMethodCallHandler(instance.handle)
   }
 
+  private func authorize(_ locationManager: CLLocationManager) {
+      switch locationManager.authorizationStatus {
+      case .notDetermined:
+          locationManager.requestAlwaysAuthorization()
+      case .authorizedAlways,
+           .authorizedWhenInUse,
+           .restricted,
+           .denied:
+          // Handle unauthorized
+          locationManager.requestAlwaysAuthorization()
+      @unknown default:
+          break
+      }
+  }
+
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     let locationManager = CLLocationManager()
     SwiftBackgroundLocationMonitoringPlugin.locationManager = locationManager
@@ -28,38 +43,31 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin {
 
     SwiftBackgroundLocationMonitoringPlugin.channel?.invokeMethod("location", arguments: "method")
 
-    if (call.method == "start_monitoring") {
+    if (call.method == "start_visit_monitoring") {
         // not sure what this is for
         // SwiftBackgroundLocationPlugin.channel?.invokeMethod("location", arguments: "start_monitoring")
 
-        let args = call.arguments as? Dictionary<String, Any>
-        let distanceFilter = args?["distance_filter"] as? Double
-        SwiftBackgroundLocationPlugin.locationManager?.distanceFilter = distanceFilter ?? 0
-
-        // start monitoring the service.  request always authorization
-        if !CLLocationManager.significantLocationChangeMonitoringAvailable() {
+        if (!CLLocationManager.visitMonitoringAvailable()) {
             // The device does not support this service.
             return
         }
-        switch locationManager.authorizationStatus {
-        case .notDetermined:
-            locationManager.requestAlwaysAuthorization()
-        case .authorizedAlways,
-             .authorizedWhenInUse,
-             .restricted,
-             .denied:
-            // Handle unauthorized
-            locationManager.requestAlwaysAuthorization()
-        @unknown default:
-            break
-        }
-        locationManager?.startMonitoringSignificantLocationChanges()
         locationManager?.startMonitoringVisits()
+    } else if (call.method == "start_location_monitoring") {
+        // not sure what this is for
+        // SwiftBackgroundLocationPlugin.channel?.invokeMethod("location", arguments: "start_monitoring")
 
-    } else if (call.method == "stop_monitoring") {
+        self.authorize(locationManager)
+        locationManager?.startMonitoringSignificantLocationChanges()
+    } else if (call.method == "stop_visit_monitoring") {
         // not sure what this is for
         // SwiftBackgroundLocationPlugin.channel?.invokeMethod("location", arguments: "stop_monitoring")
-        SwiftBackgroundLocationPlugin.locationManager?.stopUpdatingLocation()
+        self.authorize(locationManager)
+        locationManager?.stopMonitoringVisits()
+    }
+    } else if (call.method == "stop_location_monitoring") {
+        // not sure what this is for
+        // SwiftBackgroundLocationPlugin.channel?.invokeMethod("location", arguments: "stop_monitoring")
+        locationManager?.stopMonitoringSignificantLocationChanges()
     }
     result(true)
   }

@@ -11,50 +11,51 @@ class BackgroundLocationMonitoring {
     return version;
   }
 
-  static stopLocationService() async {
-    return await _channel.invokeMethod('stop_monitoring');
-  }
-
-  static startVisitMonitoring(Function(Location) location) async {
-    return await _channel.invokeMethod('start_monitoring');
-  }
-
-  static getLocationUpdates(Function(Location) locationCallback) {
+  static startMonitoring(Function(Location)? locationCallback, Function(Visit)? visitCallback) async {
     // add a handler on the channel to receive updates from the native classes
-    _channel.setMethodCallHandler((MethodCall methodCall) async {
-      if (methodCall.method == 'location') {
-        var locationData = Map.from(methodCall.arguments);
-        locationCallback(
-          Location(
-              latitude: locationData['latitude'],
-              longitude: locationData['longitude'],
-              altitude: locationData['altitude'],
-              accuracy: locationData['accuracy'],
-              bearing: locationData['bearing'],
-              speed: locationData['speed'],
-              time: locationData['time'],
-              isMock: locationData['is_mock']),
-        );
-      }
-    });
+    if (locationCallback != null) {
+      // add a handler on the channel to receive updates from the native classes
+      _channel.setMethodCallHandler((MethodCall methodCall) async {
+        if (methodCall.method == 'location') {
+          var locationData = Map.from(methodCall.arguments);
+          locationCallback(
+            Location(
+                latitude: locationData['latitude'],
+                longitude: locationData['longitude'],
+                altitude: locationData['altitude'],
+                accuracy: locationData['accuracy'],
+                bearing: locationData['bearing'],
+                speed: locationData['speed'],
+                time: locationData['time'],
+                isMock: locationData['is_mock']),
+          );
+        }
+      });
+      await _channel.invokeMethod('start_location_monitoring');
+    }
+    if (visitCallback != null) {
+      _channel.setMethodCallHandler((MethodCall methodCall) async {
+        if (methodCall.method == 'visit') {
+          var visitData = Map.from(methodCall.arguments);
+          visitCallback(
+            Visit(
+                latitude: visitData['latitude'],
+                longitude: visitData['longitude'],
+                accuracy: visitData['accuracy'],
+                arrivalTime: visitData['arrivalTime'],
+                departureTime: visitData['departureTime'],
+                isMock: visitData['is_mock']),
+          );
+        }
+      });
+      await _channel.invokeMethod('start_visit_monitoring');
+    }
   }
-
-  static getVisitUpdates(Function(Visit) visitCallback) {
-    // add a handler on the channel to receive updates from the native classes
-    _channel.setMethodCallHandler((MethodCall methodCall) async {
-      if (methodCall.method == 'visit') {
-        var visitData = Map.from(methodCall.arguments);
-        visitCallback(
-          Visit(
-              latitude: visitData['latitude'],
-              longitude: visitData['longitude'],
-              accuracy: visitData['accuracy'],
-              arrivalTime: visitData['arrivalTime'],
-              departureTime: visitData['departureTime'],
-              isMock: visitData['is_mock']),
-        );
-      }
-    });
+  static stopMonitoring() async {
+    // don't await
+    _channel.invokeMethod('stop_visit_monitoring');
+    _channel.invokeMethod('stop_location_monitoring');
+    return;
   }
 }
 
