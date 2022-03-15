@@ -11,7 +11,7 @@ class BackgroundLocationMonitoring {
     return version;
   }
 
-  static startMonitoring(Function(Location)? locationCallback, Function(Visit)? visitCallback) async {
+  static startMonitoring(Function(Location)? locationCallback, Function(Visit)? visitCallback, Function(String)? statusCallback) async {
     // add a handler on the channel to receive updates from the native classes
     _channel.setMethodCallHandler((MethodCall methodCall) async {
       if ((methodCall.method == 'location') && (locationCallback != null)) {
@@ -40,15 +40,18 @@ class BackgroundLocationMonitoring {
               isMock: visitData['is_mock']),
         );
       }
+      if ((methodCall.method == 'status') && (statusCallback != null)) {
+        statusCallback(methodCall.arguments);
+      }
     });
 
+
     // start monitoring
-    if ((locationCallback != null) && (visitCallback != null)) {
-      await _channel.invokeMethod('start_monitoring_both');
-    } else if (visitCallback != null) {
-      await _channel.invokeMethod('start_visit_monitoring');
-    } else if (locationCallback != null) {
+    if (locationCallback != null) {
       await _channel.invokeMethod('start_location_monitoring');
+    }
+    if (visitCallback != null) {
+      await _channel.invokeMethod('start_visit_monitoring');
     }
   }
   static stopMonitoring() async {

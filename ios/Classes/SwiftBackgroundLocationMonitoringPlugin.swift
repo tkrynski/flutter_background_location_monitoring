@@ -37,13 +37,7 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin, C
     }
   }
 
-  private func getAuthorizationStatus(_ locationManager: CLLocationManager) -> String {
-    let authorizationStatus: CLAuthorizationStatus
-    if #available(iOS 14.0, *) {
-      authorizationStatus = locationManager.authorizationStatus
-    } else {
-      authorizationStatus = CLLocationManager.authorizationStatus()
-    }
+  private authorizationStatusToString(_ authorizationStatus: CLAuthorizationStatus) -> String {
     switch authorizationStatus {
     case .notDetermined:
         return "notDetermined"
@@ -58,6 +52,16 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin, C
     @unknown default:
         return "unknown"
     }
+  }
+
+  private func getAuthorizationStatus(_ locationManager: CLLocationManager) -> String {
+    let authorizationStatus: CLAuthorizationStatus
+    if #available(iOS 14.0, *) {
+      authorizationStatus = locationManager.authorizationStatus
+    } else {
+      authorizationStatus = CLLocationManager.authorizationStatus()
+    }
+    return authorizationStatusToString(authorizationStatus)
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -76,52 +80,34 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin, C
     if (call.method == "start_visit_monitoring") {
         self.authorize(locationManager)
         locationManager.startMonitoringVisits()
+        result(true)
     } else if (call.method == "start_location_monitoring") {
-        if (!CLLocationManager.significantLocationChangeMonitoringAvailable()) {
-            // The device does not support this service.
-            result(false)
-        }
-        self.authorize(locationManager)
-        locationManager.startMonitoringSignificantLocationChanges()
-    } else if (call.method == "start_monitoring_both") {
-        self.authorize(locationManager)
-        locationManager.startMonitoringVisits()
         if (CLLocationManager.significantLocationChangeMonitoringAvailable()) {
+          self.authorize(locationManager)
           locationManager.startMonitoringSignificantLocationChanges()
+          result(true)
         } else {
           result(false)
         }
     } else if (call.method == "stop_visit_monitoring") {
         locationManager.stopMonitoringVisits()
+        result(true)
     } else if (call.method == "stop_location_monitoring") {
         locationManager.stopMonitoringSignificantLocationChanges()
-    } else if (call.method == "stop_monitoring_both") {
-        locationManager.stopMonitoringSignificantLocationChanges()
-        locationManager.stopMonitoringVisits()
-    }
-
-    if (call.method == "get_authorization_status") {
+        result(true)
+    } else if (call.method == "get_authorization_status") {
         result(self.getAuthorizationStatus(locationManager))
     } else {
-      result(true)
+        result(true)
     }
   }
 
-// Handle authorizationStatus changes that happen outside of the app
-//   func locationManager(_ manager: CLLocationManager,
-//                        didChangeAuthorization status: CLAuthorizationStatus) {
-//       switch status {
-//       case .authorizedAlways:
-//            // Handle authorized
-//       case .notDetermined,
-//            .authorizedWhenInUse,
-//            .restricted,
-//            .denied:
-//            // Handle unauthorized
-//       @unknown default:
-//           break
-//       }
-//   }
+  // Handle authorizationStatus changes that happen outside of the app
+  func locationManager(_ manager: CLLocationManager,
+                       didChangeAuthorization status: CLAuthorizationStatus) {
+      let status = authorizationStatusToString(authorizationStatus)
+      SwiftBackgroundLocationMonitoringPlugin.channel?.invokeMethod("status", arguments: status)
+  }
 
   public func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
     let visit = [
