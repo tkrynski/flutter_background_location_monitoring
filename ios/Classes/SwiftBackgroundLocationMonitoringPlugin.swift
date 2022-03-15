@@ -37,7 +37,7 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin, C
     }
   }
 
-  private authorizationStatusToString(_ authorizationStatus: CLAuthorizationStatus) -> String {
+  private func authorizationStatusToString(_ authorizationStatus: CLAuthorizationStatus) -> String {
     switch authorizationStatus {
     case .notDetermined:
         return "notDetermined"
@@ -103,8 +103,8 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin, C
   }
 
   // Handle authorizationStatus changes that happen outside of the app
-  func locationManager(_ manager: CLLocationManager,
-                       didChangeAuthorization status: CLAuthorizationStatus) {
+  public func locationManager(_ manager: CLLocationManager,
+                       didChangeAuthorization authorizationStatus: CLAuthorizationStatus) {
       let status = authorizationStatusToString(authorizationStatus)
       SwiftBackgroundLocationMonitoringPlugin.channel?.invokeMethod("status", arguments: status)
   }
