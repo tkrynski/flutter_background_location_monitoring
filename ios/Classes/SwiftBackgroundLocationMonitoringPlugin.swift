@@ -1,96 +1,129 @@
 import Flutter
 import UIKit
+import CoreLocation
 
-public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin {
+public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin, CLLocationManagerDelegate {
   static var locationManager: CLLocationManager?
   static var channel: FlutterMethodChannel?
 
   public static func register(with registrar: FlutterPluginRegistrar) {
-    SwiftBackgroundLocationPlugin.channel = FlutterMethodChannel(name: "background_location_monitoring", binaryMessenger: registrar.messenger())
+    let channel = FlutterMethodChannel(name: "background_location_monitoring", binaryMessenger: registrar.messenger())
     let instance = SwiftBackgroundLocationMonitoringPlugin()
-    registrar.addMethodCallDelegate(instance, channel: SwiftBackgroundLocationPlugin.channel)
+    registrar.addMethodCallDelegate(instance, channel: channel)
 
     // not sure if this is needed
-    // SwiftBackgroundLocationMonitoringPlugin.channel?.setMethodCallHandler(instance.handle)
+    channel.setMethodCallHandler(instance.handle)
+    SwiftBackgroundLocationMonitoringPlugin.channel = channel
   }
 
   private func authorize(_ locationManager: CLLocationManager) {
-      switch locationManager.authorizationStatus {
-      case .notDetermined:
-          locationManager.requestAlwaysAuthorization()
-      case .authorizedAlways,
-           .authorizedWhenInUse,
-           .restricted,
-           .denied:
-          // Handle unauthorized
-          locationManager.requestAlwaysAuthorization()
-      @unknown default:
-          break
-      }
+    let authorizationStatus: CLAuthorizationStatus
+    if #available(iOS 14.0, *) {
+      authorizationStatus = locationManager.authorizationStatus
+    } else {
+      authorizationStatus = CLLocationManager.authorizationStatus()
+    }
+    switch authorizationStatus {
+    case .notDetermined:
+        locationManager.requestAlwaysAuthorization()
+    case .authorizedAlways,
+         .authorizedWhenInUse,
+         .restricted,
+         .denied:
+        // Handle unauthorized
+        locationManager.requestAlwaysAuthorization()
+    @unknown default:
+        break
+    }
+  }
+
+  private func getAuthorizationStatus(_ locationManager: CLLocationManager) -> String {
+    let authorizationStatus: CLAuthorizationStatus
+    if #available(iOS 14.0, *) {
+      authorizationStatus = locationManager.authorizationStatus
+    } else {
+      authorizationStatus = CLLocationManager.authorizationStatus()
+    }
+    switch authorizationStatus {
+    case .notDetermined:
+        return "notDetermined"
+    case .authorizedAlways:
+        return "authorizedAlways"
+    case .authorizedWhenInUse:
+        return "authorizedWhenInUse"
+    case .restricted:
+        return "restricted"
+    case .denied:
+        return "denied"
+    @unknown default:
+        return "unknown"
+    }
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     let locationManager = CLLocationManager()
     SwiftBackgroundLocationMonitoringPlugin.locationManager = locationManager
-    locationManager?.delegate = self
-    locationManager?.requestAlwaysAuthorization()
-    locationManager?.allowsBackgroundLocationUpdates = true
-    locationManager?.pausesLocationUpdatesAutomatically = false
-    locationManager?.activityType = CLActivityType.other
-    if #available(iOS 11.0, *) {
-        locationManager?.showsBackgroundLocationIndicator = true;
-    }
 
-    SwiftBackgroundLocationMonitoringPlugin.channel?.invokeMethod("location", arguments: "method")
+    locationManager.delegate = self
+    locationManager.requestAlwaysAuthorization()
+    locationManager.allowsBackgroundLocationUpdates = true
+    locationManager.pausesLocationUpdatesAutomatically = false
+    locationManager.activityType = CLActivityType.other
+    if #available(iOS 11.0, *) {
+        locationManager.showsBackgroundLocationIndicator = true
+    }
 
     if (call.method == "start_visit_monitoring") {
-        // not sure what this is for
-        // SwiftBackgroundLocationPlugin.channel?.invokeMethod("location", arguments: "start_monitoring")
-
-        if (!CLLocationManager.visitMonitoringAvailable()) {
-            // The device does not support this service.
-            return
-        }
-        locationManager?.startMonitoringVisits()
+        self.authorize(locationManager)
+        locationManager.startMonitoringVisits()
     } else if (call.method == "start_location_monitoring") {
-        // not sure what this is for
-        // SwiftBackgroundLocationPlugin.channel?.invokeMethod("location", arguments: "start_monitoring")
-
+        if (!CLLocationManager.significantLocationChangeMonitoringAvailable()) {
+            // The device does not support this service.
+            result(false)
+        }
         self.authorize(locationManager)
-        locationManager?.startMonitoringSignificantLocationChanges()
+        locationManager.startMonitoringSignificantLocationChanges()
+    } else if (call.method == "start_monitoring_both") {
+        self.authorize(locationManager)
+        locationManager.startMonitoringVisits()
+        if (CLLocationManager.significantLocationChangeMonitoringAvailable()) {
+          locationManager.startMonitoringSignificantLocationChanges()
+        } else {
+          result(false)
+        }
     } else if (call.method == "stop_visit_monitoring") {
-        // not sure what this is for
-        // SwiftBackgroundLocationPlugin.channel?.invokeMethod("location", arguments: "stop_monitoring")
-        self.authorize(locationManager)
-        locationManager?.stopMonitoringVisits()
-    }
+        locationManager.stopMonitoringVisits()
     } else if (call.method == "stop_location_monitoring") {
-        // not sure what this is for
-        // SwiftBackgroundLocationPlugin.channel?.invokeMethod("location", arguments: "stop_monitoring")
-        locationManager?.stopMonitoringSignificantLocationChanges()
+        locationManager.stopMonitoringSignificantLocationChanges()
+    } else if (call.method == "stop_monitoring_both") {
+        locationManager.stopMonitoringSignificantLocationChanges()
+        locationManager.stopMonitoringVisits()
     }
-    result(true)
+
+    if (call.method == "get_authorization_status") {
+        result(self.getAuthorizationStatus(locationManager))
+    } else {
+      result(true)
+    }
   }
 
-  func locationManager(_ manager: CLLocationManager,
-                       didChangeAuthorization status: CLAuthorizationStatus) {
-      switch status {
-      case .authorizedAlways:
-        locationManager?.startMonitoringSignificantLocationChanges()
-          locationManager.startMonitoringVisits()
-      case .notDetermined,
-           .authorizedWhenInUse,
-           .restricted,
-           .denied:
-           // Handle unauthorized
-          locationManager?.startMonitoringSignificantLocationChanges()
-          locationManager.startMonitoringVisits()
-      @unknown default:
-          break
-      }
-  }
+// Handle authorizationStatus changes that happen outside of the app
+//   func locationManager(_ manager: CLLocationManager,
+//                        didChangeAuthorization status: CLAuthorizationStatus) {
+//       switch status {
+//       case .authorizedAlways:
+//            // Handle authorized
+//       case .notDetermined,
+//            .authorizedWhenInUse,
+//            .restricted,
+//            .denied:
+//            // Handle unauthorized
+//       @unknown default:
+//           break
+//       }
+//   }
 
-  func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
+  public func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
     let visit = [
         "latitude": visit.coordinate.latitude,
         "longitude": visit.coordinate.longitude,
@@ -102,19 +135,7 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin {
 
     SwiftBackgroundLocationMonitoringPlugin.channel?.invokeMethod("visit", arguments: visit)
   }
-  private func postDebugVisit(for visit: CLVisit) {
-      let location = CLLocation(coordinate: visit.coordinate,
-                                altitude: 0,
-                                horizontalAccuracy: visit.horizontalAccuracy,
-                                verticalAccuracy: 0,
-                                timestamp: visit.arrivalDate)
-      if (visit.departureDate != NSDate.distantFuture) {
-          postDebugGeocodedLocation(for: location, title: "End visit \(visit.departureDate)")
-      } else {
-          postDebugGeocodedLocation(for: location, title: "Start visit \(visit.arrivalDate)")
-      }
-  }
-  func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+  public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
     if let lastLocation = locations.last {
       let location = [
           "speed": lastLocation.speed,
