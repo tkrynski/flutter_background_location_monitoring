@@ -17,24 +17,7 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin, C
   }
 
   private func authorize(_ locationManager: CLLocationManager) {
-    let authorizationStatus: CLAuthorizationStatus
-    if #available(iOS 14.0, *) {
-      authorizationStatus = locationManager.authorizationStatus
-    } else {
-      authorizationStatus = CLLocationManager.authorizationStatus()
-    }
-    switch authorizationStatus {
-    case .notDetermined:
-        locationManager.requestAlwaysAuthorization()
-    case .authorizedAlways,
-         .authorizedWhenInUse,
-         .restricted,
-         .denied:
-        // Handle unauthorized
-        locationManager.requestAlwaysAuthorization()
-    @unknown default:
-        break
-    }
+    locationManager.requestAlwaysAuthorization()
   }
 
   private func authorizationStatusToString(_ authorizationStatus: CLAuthorizationStatus) -> String {
