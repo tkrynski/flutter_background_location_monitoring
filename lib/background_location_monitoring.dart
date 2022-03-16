@@ -62,9 +62,12 @@ class BackgroundLocationMonitoring {
   }
 
   static Future<String> getAuthorizationStatus() async {
-    // don't await
     dynamic status = await _channel.invokeMethod('get_authorization_status');
     return status.toString();
+  }
+  static Future<String> getSettingsUrl() async {
+    dynamic url = await _channel.invokeMethod('get_settings_url');
+    return url.toString();
   }
 }
 
