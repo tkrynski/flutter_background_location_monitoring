@@ -32,6 +32,10 @@ flutter:
     # -------------------
       ios:
         pluginClass: BackgroundLocationMonitoringPlugin
+      android:
+        package: com.tkrynski.background_location_monitoring.flutter_background_location_monitoring
+        pluginClass: FlutterBackgroundLocationMonitoringPlugin
+
     # -------------------
 
   # To add assets to your plugin package, add an assets section, like this:

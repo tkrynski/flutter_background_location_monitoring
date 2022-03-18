@@ -81,13 +81,7 @@ public class SwiftBackgroundLocationMonitoringPlugin: NSObject, FlutterPlugin, C
     } else if (call.method == "get_authorization_status") {
         result(self.getAuthorizationStatus(locationManager))
     } else if (call.method == "get_settings_url") {
-      var url
-      if #available(iOS 13.0, *) {
-        url = URL(string:UIApplication.openSettingsURLString) {
-      } else {
-        url = URL(string:UIApplicationOpenSettingsURLString) {
-      }
-      result(url)
+      result(string:UIApplication.openSettingsURLString)
     } else {
         result(true)
     }
